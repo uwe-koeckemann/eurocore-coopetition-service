@@ -5,3 +5,5 @@ has_author,author_of,Authors,Authored Works,Author of an entry
 implements,implemented_by,Based on,Implementations,Implements work described in another entry
 uses,used_by,Usages,Uses,"This entry (e.g., team) uses an entry"
 offers,offered_by,Offers,Offered By,"Entry is offered by another entry (e.g., team)."
+member_of,has_member,Groups,Members,"Entry is member of a group entry (e.g., research group or league)."
+developed_by,developer_of,Developed,Developers,"Entry is developed by another entry (e.g., group, team)"

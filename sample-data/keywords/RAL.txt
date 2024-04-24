@@ -6,8 +6,6 @@ Actuation and Joint Mechanisms
 
 Additive Manufacturing
 
-Additive Manufacturing
-
 Aerial Systems: Applications
 
 Aerial Systems: Mechanics and Control
