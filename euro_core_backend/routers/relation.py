@@ -64,3 +64,16 @@ def delete_relation(*, session: Session = Depends(get_session),
         return db_row
     except NoResultFound:
         raise HTTPException(status_code=404, detail=f"Relation {relation_type_id}/{from_id}/{to_id} does not exist")
+
+
+@router.delete("/delete-relations/{entry_id}", response_model=List[Relation])
+def delete_relations_of_entry(*, session: Session = Depends(get_session),
+                              entry_id: int):
+    to_delete = list(session.exec(select(Relation).where(Relation.to_id == entry_id)))
+    to_delete.extend(session.exec(select(Relation).where(Relation.from_id == entry_id)))
+
+    for row in to_delete:
+        session.delete(row)
+    session.commit()
+
+    return to_delete

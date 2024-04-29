@@ -5,14 +5,12 @@ from fastapi import HTTPException, Depends
 from sqlmodel import Session, select
 
 from euro_core_backend import helpers
-from euro_core_backend.data.entry import Entry, EntryBase
-from euro_core_backend.data.entry_tag_link import EntryTagLink
-from euro_core_backend.data.relation import Relation
-from euro_core_backend.data.relation_type import RelationType
-from euro_core_backend.data.tag import Tag
+from euro_core_backend.data.entry import Entry
+from euro_core_backend.data.team import Team
 from euro_core_backend.data.team_tokens import TeamTokens
 from euro_core_backend.dependencies import get_session
 from euro_core_backend.relation_query import RelationQuery
+from euro_core_backend.routers import relation, team_tokens, entry
 
 router = APIRouter(
     prefix="/team",
@@ -22,7 +20,42 @@ router = APIRouter(
 )
 
 
-@router.get("/get/{team_id}/{league_id}")
+def _fetch_additional_team_info(session: Session, team_entry: Entry, league_entry: Entry) -> Team:
+    team_tokens_row = team_tokens.get_team(session, team_entry.id, league_entry.id)
+
+    queries = [
+        RelationQuery("uses", "Robot", False, "Robots"),
+        RelationQuery("member_of", "Group", False, "Groups")
+    ]
+
+    data = helpers.get_entry_relations(session, team_entry.id, queries)
+
+    team = Team(
+        id=team_entry.id,
+        name=team_entry.name,
+        league_id=league_entry.id,
+        league_name=league_entry.name,
+        robots=data["Robots"],
+        groups=data["Groups"],
+        points=team_tokens_row.points,
+    )
+
+    return team
+
+
+def _add_team_relations(session, team):
+    # Add relations to robots and groups
+    member_of_id = helpers.lazy_get_relation_id(session, "member_of")
+    for group_id in team.group_ids:
+        relation.create_relation(session, member_of_id, team.id, group_id)
+    uses_id = helpers.lazy_get_relation_id(session, "uses")
+    for robot_id in team.robot_ids:
+        relation.create_relation(session, uses_id, team.id, robot_id)
+
+
+@router.get("/get/{team_id}/{league_id}",
+            response_model=Team,
+            description="Get a team's data for a specific league.")
 def get_by_id(*,
               session: Session = Depends(get_session),
               team_id: int,
@@ -30,83 +63,94 @@ def get_by_id(*,
     team_entry = helpers.get_by_id(session, team_id, Entry)
     if not team_entry:
         raise HTTPException(status_code=404)
-    league_entry = helpers.get_by_id(session, team_id, Entry)
+    league_entry = helpers.get_by_id(session, league_id, Entry)
     if not league_entry:
         raise HTTPException(status_code=404)
-    team_id = team_entry.id
 
-    sql_query = (select(TeamTokens)
-                 .where(TeamTokens.team_id == team_id)
-                 .where(TeamTokens.league_id == league_entry.id))
-    team_tokens_row = session.exec(sql_query).one()
-
-    # team_tokens = helpers.get()
-
-    queries = [
-        RelationQuery("uses", "Robot", False, "Robots"),
-    ]
-
-    data = helpers.get_entry_relations(session, team_id, queries)
-
-    team_entry.league = league_entry.name
-    team_entry.robots = data["Robots"]
-    team_entry.points = team_tokens_row.points
-
-    return team_entry
+    return _fetch_additional_team_info(session, team_entry, league_entry)
 
 
-@router.get("/get-by-name/{name}", response_model=Entry)
+@router.get("/get-by-name/{team_name}/{league_name}", response_model=Team)
 def get_entry_by_name(*,
                       session: Session = Depends(get_session),
-                      name: str):
-    return helpers.get_by_name(session, name, Entry)
+                      team_name: str,
+                      league_name: str):
+    team_entry = helpers.get_by_name(session, team_name, Entry)
+    if not team_entry:
+        raise HTTPException(status_code=404)
+    league_entry = helpers.get_by_name(session, league_name, Entry)
+    if not league_entry:
+        raise HTTPException(status_code=404)
+
+    return _fetch_additional_team_info(session, team_entry, league_entry)
 
 
-@router.get("/get-all", response_model=List[Entry])
+@router.get("/get-all", response_model=List[Team])
 def get_all_entries(*,
-                    session: Session = Depends(get_session), ):
-    results = session.exec(select(Entry))
-    return results.all()
+                    session: Session = Depends(get_session)):
+    results = []
+    for token_row in session.exec(select(TeamTokens)):
+        results.append(get_by_id(session, token_row.id, token_row.league_id))
+    return results
 
 
-@router.post("/create", response_model=Entry)
-def create_entry(*,
-                 session: Session = Depends(get_session),
-                 entry: EntryBase):
-    return helpers.create(session, entry, Entry)
+@router.post("/create", response_model=Team)
+def create(*,
+           session: Session = Depends(get_session),
+           team: Team):
+    league_entry = helpers.get_by_id(session, team.league_id, Entry)
+    if not league_entry:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    # Create team entry
+    team_entry = helpers.create(session, team, Entry)
+
+    # Add relations to robots and groups
+    _add_team_relations(session, team)
+
+    # Create team_tokens row
+    team_tokens_row = TeamTokens(
+        team_id=team_entry.id,
+        league_id=league_entry.id,
+        points=team.points,
+    )
+    team_tokens.create_team(session, team_tokens_row)
+
+    # Add id to team argument and return
+    team.id = team_entry.id
+    team.league_name = league_entry.name
+
+    return team
 
 
-@router.post("/add-tag/{entry_id}/{tag_id}")
-def add_entry_tag(*,
-                  session: Session = Depends(get_session),
-                  entry_id: int,
-                  tag_id: int):
-    new_entry_entry_link = EntryTagLink(entry_id=entry_id, tag_id=tag_id)
-    session.add(new_entry_entry_link)
-    session.commit()
-    return {}
-
-
-@router.get("/get-tags/{entry_id}", response_model=List[Tag])
-def get_all_tags(*,
-                 session: Session = Depends(get_session),
-                 entry_id: int):
-    db_entry = session.get(Entry, entry_id)
-
-    if not db_entry:
-        raise HTTPException(status_code=404, detail=f"Entry not found (ID): {entry_id}")
-    return db_entry.tags
-
-
-@router.put("/update", response_model=Entry)
+@router.put("/update", response_model=Team)
 def update_entry(*,
                  session: Session = Depends(get_session),
-                 entry: Entry):
-    return helpers.update(session, entry, Entry)
+                 team: Team):
+    helpers.update(session, team, Entry)
+    # Create team_tokens row
+    team_tokens_row = TeamTokens(
+        team_id=team.id,
+        league_id=team.league_id,
+        points=team.points,
+    )
+    team_tokens.update_team(session, team_tokens_row)
+
+    # Add all relations
+    # relation.delete_relations_of_entry(session, team.id)
+    _add_team_relations(session, team)
+
+    return team
 
 
-@router.delete("/delete/{entry_id}", response_model=Entry)
-def delete_entry(*,
-                 session: Session = Depends(get_session),
-                 entry_id: int):
-    return helpers.delete(session, entry_id, Entry)
+@router.delete("/delete/{team_id}/{league_id}", response_model=Team)
+def delete_team(*,
+                session: Session = Depends(get_session),
+                team_id: int,
+                league_id: int):
+    team = get_by_id(session, team_id, league_id)
+    relation.delete_relations_of_entry(session, team_id)
+    team_tokens_row = team_tokens.get_team(session, team_id, league_id)
+    session.delete(team_tokens_row)
+    helpers.delete(session, team_id, Entry)
+    return team

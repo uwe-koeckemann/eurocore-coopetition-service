@@ -40,6 +40,20 @@ def get_all_entries(*,
     return results.all()
 
 
+@router.post("/get-all-with-tag/{tag_id}", response_model=List[Entry])
+def get_all_with_tag(*,
+                     session: Session = Depends(get_session),
+                     tag_id: int):
+    all_entries = session.exec(select(Entry))
+    selected = []
+    for entry in all_entries:
+        for entry_tag_id in entry.tags:
+            if entry_tag_id == tag_id:
+                selected.append(entry)
+                break
+    return selected
+
+
 @router.post("/create", response_model=Entry)
 def create_entry(*,
                  session: Session = Depends(get_session),

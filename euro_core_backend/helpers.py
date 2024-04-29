@@ -30,7 +30,7 @@ def get_by_name(session, name, data_type):
         raise HTTPException(status_code=404, detail=f"No {data_type.__name__} row found with name: {name}")
 
 
-def _lazy_get_tag_id(session, name):
+def lazy_get_tag_id(session, name):
     if name in _tag_id_cache.keys():
         return _tag_id_cache[name]
     tag_id = get_by_name(session, name, Tag).id
@@ -38,7 +38,7 @@ def _lazy_get_tag_id(session, name):
     return tag_id
 
 
-def _lazy_get_relation_id(session, name):
+def lazy_get_relation_id(session, name):
     if name in _relation_id_cache.keys():
         return _relation_id_cache[name]
     relation_id = get_by_name(session, name, RelationType).id
@@ -71,8 +71,8 @@ def get_entry_relations_single(session, db_id, query: RelationQuery, data):
     :param query: Query to execute
     :param data: Dictionary to store related objects
     """
-    relation_id = _lazy_get_relation_id(session, query.relation_name)
-    tag_id = _lazy_get_tag_id(session, query.required_tag)
+    relation_id = lazy_get_relation_id(session, query.relation_name)
+    tag_id = lazy_get_tag_id(session, query.required_tag)
     if query.category_name not in data.keys():
         data[query.category_name] = []
     if query.want_source:

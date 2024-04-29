@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends
 from sqlmodel import SQLModel
 
 from euro_core_backend.routers import (tag, entry, relation_type, relation, team_tokens, module_offer, module_usage,
-                                       milestone, milestone_score)
+                                       milestone, milestone_score, team, robot)
 from euro_core_backend.dependencies import get_session, engine
 
 
@@ -29,7 +29,8 @@ app.include_router(module_offer.router)
 app.include_router(module_usage.router)
 app.include_router(milestone.router)
 app.include_router(milestone_score.router)
-
+app.include_router(team.router)
+app.include_router(robot.router)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

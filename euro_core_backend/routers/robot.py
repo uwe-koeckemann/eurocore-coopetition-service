@@ -7,13 +7,11 @@ from sqlmodel import Session, select
 from euro_core_backend import helpers
 from euro_core_backend.data.entry import Entry, EntryBase
 from euro_core_backend.data.entry_tag_link import EntryTagLink
-from euro_core_backend.data.relation import Relation
-from euro_core_backend.data.relation_type import RelationType
 from euro_core_backend.data.robot import Robot
 from euro_core_backend.data.tag import Tag
-from euro_core_backend.data.team_tokens import TeamTokens
 from euro_core_backend.dependencies import get_session
 from euro_core_backend.relation_query import RelationQuery
+from euro_core_backend.routers import relation, entry
 
 router = APIRouter(
     prefix="/robot",
@@ -23,6 +21,42 @@ router = APIRouter(
 )
 
 
+def _fetch_additional_robot_info(session: Session, robot_entry: Entry) -> Robot:
+    queries = [
+        RelationQuery("uses", "Team", True, "Users"),
+        RelationQuery("part_of", "Hardware", False, "Hardware"),
+        RelationQuery("supports", "Module", False, "Modules")
+    ]
+
+    data = helpers.get_entry_relations(session, robot_entry.id, queries)
+
+    robot = Robot(
+        id=robot_entry.id,
+        name=robot_entry.name,
+        description=robot_entry.description,
+        tags=robot_entry.tags,
+        user_ids=data["Users"],
+        hardware_ids=data["Hardware"],
+        module_ids=data["Modules"],
+    )
+
+    return robot
+
+
+def _add_robot_relations(session, robot):
+    uses_id = helpers.lazy_get_relation_id(session, "uses")
+    for user_id in robot.user_ids:
+        relation.create_relation(session, uses_id, user_id, robot.id)
+
+    member_of_id = helpers.lazy_get_relation_id(session, "part_of")
+    for hardware_id in robot.hardware_ids:
+        relation.create_relation(session, member_of_id, hardware_id, robot.id)
+
+    module_of_id = helpers.lazy_get_relation_id(session, "supports")
+    for module_id in robot.module_ids:
+        relation.create_relation(session, module_of_id, robot.id, module_id)
+
+
 @router.get("/get/{robot_id}", response_model=Robot)
 def get_by_id(*,
               session: Session = Depends(get_session),
@@ -30,79 +64,54 @@ def get_by_id(*,
     robot_entry = helpers.get_by_id(session, robot_id, Entry)
     if not robot_entry:
         raise HTTPException(status_code=404)
+    return _fetch_additional_robot_info(session, robot_entry)
 
-    queries = [
-        RelationQuery("uses", "Team", True, "Teams"),
-        RelationQuery("part_of", "Hardware", False, "Hardware"),
-        RelationQuery("supports", "Module", False, "Modules")
-    ]
 
-    data = helpers.get_entry_relations(session, robot_id, queries)
+@router.get("/get-by-name/{name}", response_model=Entry)
+def get_by_name(*,
+                session: Session = Depends(get_session),
+                name: str):
+    robot_entry = helpers.get_by_name(session, name, Entry)
+    if not robot_entry:
+        raise HTTPException(status_code=404)
+    return _fetch_additional_robot_info(session, robot_entry)
 
-    robot = Robot(
-        id=robot_entry.id,
-        name=robot_entry.name,
-        description=robot_entry.description,
-        user_ids=data["Teams"],
-        hardware_ids=data["Hardware"],
-        module_ids=data["Modules"]
-    )
+
+@router.get("/get-all", response_model=List[Robot])
+def get_all(*,
+            session: Session = Depends(get_session)):
+    robot_entries = entry.get_all_with_tag(session, helpers.lazy_get_tag_id(session, "Robot"))
+    results = []
+    for robot_entry in robot_entries:
+        results.append(_fetch_additional_robot_info(session, robot_entry))
+    return results
+
+
+@router.post("/create", response_model=Robot)
+def create(*,
+           session: Session = Depends(get_session),
+           robot: Robot):
+    robot_entry = helpers.create(session, robot, Entry)
+    _add_robot_relations(session, robot)
+    robot.id = robot_entry.id
+    return robot
+
+
+@router.put("/update", response_model=Robot)
+def update(*,
+           session: Session = Depends(get_session),
+           robot: Robot):
+    # relation.delete_relations_of_entry(session, robot.id)
+    _add_robot_relations(session, robot)
 
     return robot
 
 
-@router.get("/get-by-name/{name}", response_model=Entry)
-def get_entry_by_name(*,
-                      session: Session = Depends(get_session),
-                      name: str):
-    return helpers.get_by_name(session, name, Entry)
-
-
-@router.get("/get-all", response_model=List[Entry])
-def get_all_entries(*,
-                    session: Session = Depends(get_session), ):
-    results = session.exec(select(Entry))
-    return results.all()
-
-
-@router.post("/create", response_model=Entry)
-def create_entry(*,
-                 session: Session = Depends(get_session),
-                 entry: EntryBase):
-    return helpers.create(session, entry, Entry)
-
-
-@router.post("/add-tag/{entry_id}/{tag_id}")
-def add_entry_tag(*,
-                  session: Session = Depends(get_session),
-                  entry_id: int,
-                  tag_id: int):
-    new_entry_entry_link = EntryTagLink(entry_id=entry_id, tag_id=tag_id)
-    session.add(new_entry_entry_link)
-    session.commit()
-    return {}
-
-
-@router.get("/get-tags/{entry_id}", response_model=List[Tag])
-def get_all_tags(*,
-                 session: Session = Depends(get_session),
-                 entry_id: int):
-    db_entry = session.get(Entry, entry_id)
-
-    if not db_entry:
-        raise HTTPException(status_code=404, detail=f"Entry not found (ID): {entry_id}")
-    return db_entry.tags
-
-
-@router.put("/update", response_model=Entry)
-def update_entry(*,
-                 session: Session = Depends(get_session),
-                 entry: Entry):
-    return helpers.update(session, entry, Entry)
-
-
-@router.delete("/delete/{entry_id}", response_model=Entry)
-def delete_entry(*,
-                 session: Session = Depends(get_session),
-                 entry_id: int):
-    return helpers.delete(session, entry_id, Entry)
+@router.delete("/delete/{robot_id}", response_model=Robot)
+def delete(*,
+           session: Session = Depends(get_session),
+           robot_id: int):
+    robot = get_by_id(session, robot_id)
+    relation.delete_relations_of_entry(session, robot_id)
+    helpers.delete(session, robot_id, Entry)
+    return robot
