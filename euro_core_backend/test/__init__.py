@@ -4,6 +4,9 @@ test_entry_b = {"name": "Entry_B", "url": "URL", "description": "DESC", "tags": 
 test_team_a = {"name": "Team 1", "url": "URL", "description": "DESC", "tags": []}
 test_team_b = {"name": "Team 2", "url": "URL", "description": "DESC", "tags": []}
 
+test_league = {"name": "League 1", "url": "URL", "description": "DESC", "tags": []}
+
+
 test_relation_a = {
     'name': "relation_a",
     'inverse_name': "relation_a_inv",

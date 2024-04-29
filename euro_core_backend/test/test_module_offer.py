@@ -27,18 +27,15 @@ def test_create_module_offer(session: Session):
     response = client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_id,
-        "cost": 1000,
-        "integration_support": True,
-        "integration_cost": 100})
+        "royalty": 1000,
+    })
 
     app.dependency_overrides.clear()
     data = response.json()
     assert response.status_code == 200
     assert data["team_id"] == team_id
     assert data["module_id"] == module_id
-    assert data["cost"] == 1000
-    assert data["integration_support"]
-    assert data["integration_cost"] == 100
+    assert data["royalty"] == 1000
 
 
 def test_create_module_offer_with_defaults(session: Session):
@@ -49,7 +46,7 @@ def test_create_module_offer_with_defaults(session: Session):
     response = client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_id,
-        "cost": 100
+        "royalty": 100
     })
 
     app.dependency_overrides.clear()
@@ -57,11 +54,7 @@ def test_create_module_offer_with_defaults(session: Session):
     assert response.status_code == 200
     assert data["team_id"] == team_id
     assert data["module_id"] == module_id
-    assert data["cost"] == 100
-    assert not data["integration_support"]
-    assert data["integration_cost"] == 0
-
-
+    assert data["royalty"] == 100
 
 
 def test_get_module_offer(session: Session):
@@ -72,15 +65,13 @@ def test_get_module_offer(session: Session):
     response_create = client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_id,
-        "cost": 100
+        "royalty": 100
     })
     response_get = client.get(f"/module-offer/get/{response_create.json()['id']}")
     app.dependency_overrides.clear()
     data = response_get.json()
     assert response_get.status_code == 200
-    assert data["cost"] == 100
-    assert not data["integration_support"]
-    assert data["integration_cost"] == 0
+    assert data["royalty"] == 100
 
 
 def test_get_module_offer_by_id_fails(session: Session):
@@ -111,13 +102,12 @@ def test_get_module_offer_get_all_two_results(session: Session):
     client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_a_id,
-        "cost": 1000,
-        "integration_support": True,
-        "integration_cost": 100})
+        "royalty": 1000
+    })
     client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_b_id,
-        "cost": 100
+        "royalty": 100
     })
 
     response = client.get(f"/module-offer/get-all")
@@ -142,20 +132,16 @@ def test_module_offer_update_succeeds(session: Session):
     current = client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_id,
-        "cost": 100
+        "royalty": 100
     }).json()
-    current["cost"] = 200
-    current["integration_support"] = True
-    current["integration_cost"] = 50
+    current["royalty"] = 299
     response_update = client.put("/module-offer/update", json=current)
     response_get = client.get(f"/module-offer/get/{current['id']}")
 
     app.dependency_overrides.clear()
     assert response_update.status_code == 200
-    assert response_update.json()["cost"] == 200
-    assert response_get.json()["cost"] == 200
-    assert response_get.json()["integration_support"]
-    assert response_get.json()["integration_cost"] == 50
+    assert response_update.json()["royalty"] == 299
+    assert response_get.json()["royalty"] == 299
 
 
 def test_module_offer_delete_fails(session: Session):
@@ -174,7 +160,7 @@ def test_module_offer_delete_succeeds(session: Session):
     offer_id = client.post("/module-offer/create", json={
         "team_id": team_id,
         "module_id": module_id,
-        "cost": 100
+        "royalty": 100
     }).json()["id"]
     response_get_before = client.get(f"/module-offer/get/{offer_id}")
     response_delete = client.delete(f"/module-offer/delete/{offer_id}")
