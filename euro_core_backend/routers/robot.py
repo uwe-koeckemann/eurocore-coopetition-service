@@ -46,15 +46,24 @@ def _fetch_additional_robot_info(session: Session, robot_entry: Entry) -> Robot:
 def _add_robot_relations(session, robot):
     uses_id = helpers.lazy_get_relation_id(session, "uses")
     for user_id in robot.user_ids:
-        relation.create_relation(session, uses_id, user_id, robot.id)
+        relation.create_relation(session=session,
+                                 relation_type_id=uses_id,
+                                 from_id=user_id,
+                                 to_id=robot.id)
 
     member_of_id = helpers.lazy_get_relation_id(session, "part_of")
     for hardware_id in robot.hardware_ids:
-        relation.create_relation(session, member_of_id, hardware_id, robot.id)
+        relation.create_relation(session=session,
+                                 relation_type_id=member_of_id,
+                                 from_id=hardware_id,
+                                 to_id=robot.id)
 
     module_of_id = helpers.lazy_get_relation_id(session, "supports")
     for module_id in robot.module_ids:
-        relation.create_relation(session, module_of_id, robot.id, module_id)
+        relation.create_relation(session=session,
+                                 relation_type_id=module_of_id,
+                                 from_id=robot.id,
+                                 to_id=module_id)
 
 
 @router.get("/get/{robot_id}", response_model=Robot)
@@ -92,8 +101,8 @@ def create(*,
            session: Session = Depends(get_session),
            robot: Robot):
     robot_entry = helpers.create(session, robot, Entry)
-    _add_robot_relations(session, robot)
     robot.id = robot_entry.id
+    _add_robot_relations(session, robot)
     return robot
 
 

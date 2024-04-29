@@ -36,7 +36,7 @@ def test_create_succeeds(session: Session):
     client = TestClient(app)
     id_from = client.post("/entry/create", json=test_entry_a).json()['id']
     id_to = client.post("/entry/create", json=test_entry_b).json()['id']
-    rel_type = client.post("/relation_type/create", json=test_relation_a).json()['id']
+    rel_type = client.post("/relation-type/create", json=test_relation_a).json()['id']
 
     response = client.post(f"/relation/create/{rel_type}/{id_from}/{id_to}")
     app.dependency_overrides.clear()
@@ -56,7 +56,7 @@ def test_delete_succeeds(session: Session):
     client = TestClient(app)
     id_from = client.post("/entry/create", json=test_entry_a).json()['id']
     id_to = client.post("/entry/create", json=test_entry_b).json()['id']
-    rel_type = client.post("/relation_type/create", json=test_relation_a).json()['id']
+    rel_type = client.post("/relation-type/create", json=test_relation_a).json()['id']
     client.post(f"/relation/create/{rel_type}/{id_from}/{id_to}")
     response_get_a = client.get(f"/relation/get-by-type/{rel_type}")
     response = client.delete(f"/relation/delete/{rel_type}/{id_from}/{id_to}")
@@ -73,8 +73,8 @@ def test_get_incoming(session: Session):
     client = TestClient(app)
     id_from = client.post("/entry/create", json=test_entry_a).json()['id']
     id_to = client.post("/entry/create", json=test_entry_b).json()['id']
-    rel_type_a = client.post("/relation_type/create", json=test_relation_a).json()['id']
-    rel_type_b = client.post("/relation_type/create", json=test_relation_b).json()['id']
+    rel_type_a = client.post("/relation-type/create", json=test_relation_a).json()['id']
+    rel_type_b = client.post("/relation-type/create", json=test_relation_b).json()['id']
     client.post(f"/relation/create/{rel_type_a}/{id_from}/{id_to}")
     client.post(f"/relation/create/{rel_type_b}/{id_from}/{id_to}")
 
@@ -107,8 +107,8 @@ def test_relation_query_same_category(session: Session):
     client = TestClient(app)
     id_from = client.post("/entry/create", json=test_entry_a).json()['id']
     id_to = client.post("/entry/create", json=test_entry_b).json()['id']
-    rel_type_a = client.post("/relation_type/create", json=test_relation_a).json()['id']
-    rel_type_b = client.post("/relation_type/create", json=test_relation_b).json()['id']
+    rel_type_a = client.post("/relation-type/create", json=test_relation_a).json()['id']
+    rel_type_b = client.post("/relation-type/create", json=test_relation_b).json()['id']
     client.post(f"/relation/create/{rel_type_a}/{id_from}/{id_to}")
     client.post(f"/relation/create/{rel_type_b}/{id_to}/{id_from}")
 
@@ -140,8 +140,8 @@ def test_relation_query_two_categories(session: Session):
     client = TestClient(app)
     id_from = client.post("/entry/create", json=test_entry_a).json()['id']
     id_to = client.post("/entry/create", json=test_entry_b).json()['id']
-    rel_type_a = client.post("/relation_type/create", json=test_relation_a).json()['id']
-    rel_type_b = client.post("/relation_type/create", json=test_relation_b).json()['id']
+    rel_type_a = client.post("/relation-type/create", json=test_relation_a).json()['id']
+    rel_type_b = client.post("/relation-type/create", json=test_relation_b).json()['id']
     client.post(f"/relation/create/{rel_type_a}/{id_from}/{id_to}")
     client.post(f"/relation/create/{rel_type_b}/{id_to}/{id_from}")
 

@@ -22,13 +22,14 @@ def test_create_robot(session: Session):
     app.dependency_overrides[get_session] = lambda: session
     client = TestClient(app)
 
-    client.post("/relation-type/create", json={
+    response = client.post("/relation-type/create", json={
         "name": "uses",
         "inverse_name": "used_by",
         "topic": "1",
         "inverse_topic": "2",
         "description": "3",
     })
+    assert response.status_code == 200
     client.post("/relation-type/create", json={
         "name": "supports",
         "inverse_name": "supported_by",

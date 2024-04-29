@@ -9,7 +9,7 @@ from euro_core_backend.data.relation_type import RelationType
 from euro_core_backend.dependencies import get_session
 
 router = APIRouter(
-    prefix="/relation_type",
+    prefix="/relation-type",
     tags=["Relation Type"],
     dependencies=[Depends(get_session)],
     responses={404: {"description": "End-point does not exist"}},

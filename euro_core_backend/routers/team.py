@@ -47,10 +47,16 @@ def _add_team_relations(session, team):
     # Add relations to robots and groups
     member_of_id = helpers.lazy_get_relation_id(session, "member_of")
     for group_id in team.group_ids:
-        relation.create_relation(session, member_of_id, team.id, group_id)
+        relation.create_relation(session=session,
+                                 relation_type_id=member_of_id,
+                                 from_id=team.id,
+                                 to_id=group_id)
     uses_id = helpers.lazy_get_relation_id(session, "uses")
     for robot_id in team.robot_ids:
-        relation.create_relation(session, uses_id, team.id, robot_id)
+        relation.create_relation(session=session,
+                                 relation_type_id=uses_id,
+                                 from_id=team.id,
+                                 to_id=robot_id)
 
 
 @router.get("/get/{team_id}/{league_id}",
@@ -105,6 +111,10 @@ def create(*,
     # Create team entry
     team_entry = helpers.create(session, team, Entry)
 
+    # Add id to team argument and return
+    team.id = team_entry.id
+    team.league_name = league_entry.name
+
     # Add relations to robots and groups
     _add_team_relations(session, team)
 
@@ -115,10 +125,6 @@ def create(*,
         points=team.points,
     )
     team_tokens.create_team(session, team_tokens_row)
-
-    # Add id to team argument and return
-    team.id = team_entry.id
-    team.league_name = league_entry.name
 
     return team
 
